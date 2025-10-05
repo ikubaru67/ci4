@@ -31,28 +31,6 @@ composer create-project codeigniter4/appstarter ci4_enterprise
 cd ci4_enterprise
 ```
 
-### 1.2 Konfigurasi Environment
-Copy file `env` menjadi `.env`:
-```bash
-cp env .env
-```
-
-Edit file `.env`:
-```env
-CI_ENVIRONMENT = development
-
-app.baseURL = 'http://localhost/ci4_enterprise/public/'
-app.indexPage = ''
-
-# Untuk development
-app.forceGlobalSecureRequests = false
-```
-
-### 1.3 Test Setup
-Akses `http://localhost/ci4_enterprise/public/` - pastikan welcome page CodeIgniter muncul.
-
----
-
 ## Langkah 2: Membuat Sistem Authentication
 
 ### 2.1 Buat User Model
