@@ -1274,10 +1274,10 @@ Update `app/Controllers/FormController.php`, tambahkan method logging:
 ### 6.1 Testing Manual
 
 **Test Authentication:**
-1. Buka `http://localhost/ci4_enterprise/public/login`
+1. Buka `http://localhost:8080/login`
 2. Test dengan credentials:
-   - Admin: `admin` / `admin123`
-   - User: `user` / `user123`
+   - Admin: `ikubaru` / `password`
+   - User: `ikhbal` / `password`
 3. Test invalid credentials untuk error handling
 4. Test empty fields untuk validation
 
