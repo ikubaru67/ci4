@@ -1270,7 +1270,7 @@ public/assets/
 ├── tsparticles/
 │   └── amongus/
 │       ├── config.js
-│       └── init.js
+│       └── style.css
 ```
 
 ### 4.2 Buat Among Us Particle Configuration
