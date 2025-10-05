@@ -31,6 +31,8 @@ composer create-project codeigniter4/appstarter ci4_enterprise
 cd ci4_enterprise
 ```
 
+---
+
 ## Langkah 2: Membuat Sistem Authentication
 
 ### 2.1 Buat User Model
@@ -320,29 +322,78 @@ class FormController extends BaseController
 
 ### 2.3 Update BaseController untuk Security Headers
 
-Edit file `app/Controllers/BaseController.php`, tambahkan method di dalam class:
+Edit file `app/Controllers/BaseController.php`, update bagian helpers dan tambahkan method security:
+
+Pada bagian helpers, tambahkan 'security':
+```php
+    /**
+     * An array of helpers to be loaded automatically upon
+     * class instantiation. These helpers will be available
+     * to all other controllers that extend BaseController.
+     *
+     * @var list<string>
+     */
+    protected $helpers = ['form', 'url', 'security'];
+```
+
+Pada method `initController()`:
 ```php
     public function initController(RequestInterface $request, ResponseInterface $response, LoggerInterface $logger)
     {
+        // Do Not Edit This Line
         parent::initController($request, $response, $logger);
-        
-        // Set security headers
-        $this->setSecurityHeaders();
+
+        // XSS Protection: Set Content Security Policy headers
+        $this->setSecurityHeaders($response);
+
+        // Preload any models, libraries, etc, here.
+
+        // E.g.: $this->session = service('session');
     }
-    
-    protected function setSecurityHeaders()
+```
+
+Tambahkan method `setSecurityHeaders()`:
+```php
+    /**
+     * Set security headers untuk XSS Protection
+     */
+    protected function setSecurityHeaders(ResponseInterface $response)
     {
-        // Prevent MIME type sniffing
-        header("X-Content-Type-Options: nosniff");
-        
-        // Prevent clickjacking
-        header("X-Frame-Options: SAMEORIGIN");
-        
-        // XSS Protection
-        header("X-XSS-Protection: 1; mode=block");
-        
-        // Content Security Policy
-        header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com; img-src 'self' data: cdn.jsdelivr.net; font-src 'self' cdnjs.cloudflare.com; object-src 'none';");
+        // Content Security Policy - Mencegah XSS attacks
+        $csp = "default-src 'self'; " .
+               "script-src 'self' 'unsafe-inline' 'unsafe-eval' " .
+               "cdn.jsdelivr.net cdnjs.cloudflare.com particles.js.org; " .
+               "style-src 'self' 'unsafe-inline' " .
+               "cdn.jsdelivr.net cdnjs.cloudflare.com; " .
+               "img-src 'self' data: particles.js.org; " .
+               "font-src 'self' cdnjs.cloudflare.com; " .
+               "connect-src 'self'; " .
+               "frame-ancestors 'none'; " .
+               "form-action 'self'; " .
+               "base-uri 'self';";
+
+        $response->setHeader('Content-Security-Policy', $csp);
+
+        // X-Content-Type-Options - Mencegah MIME sniffing
+        $response->setHeader('X-Content-Type-Options', 'nosniff');
+
+        // X-Frame-Options - Mencegah clickjacking
+        $response->setHeader('X-Frame-Options', 'DENY');
+
+        // X-XSS-Protection - Enable XSS filtering di browser
+        $response->setHeader('X-XSS-Protection', '1; mode=block');
+
+        // Referrer Policy - Kontrol informasi referrer
+        $response->setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+        // Strict-Transport-Security untuk HTTPS (optional, if using HTTPS)
+        if ($this->request->isSecure()) {
+            $response->setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+        }
+
+        // Feature Policy - Kontrol fitur browser
+        $response->setHeader('Permissions-Policy', 
+            'camera=(), microphone=(), geolocation=(), payment=()');
     }
 ```
 
@@ -912,7 +963,293 @@ Buat file `app/Views/dashboard/simple.php`:
 </html>
 ```
 
-### 3.4 Update Demo Accounts Information
+Buat file `app/Views/dashboard/admin_simple.php`:
+```php
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= $title ?> - CI4 Simple</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Animate.css -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <!-- Among Us Particles CSS -->
+    <link href="<?= base_url('assets/tsparticles/amongus/style.css') ?>" rel="stylesheet">
+</head>
+<body class="d-flex flex-column min-vh-100">
+    <!-- Particles Background -->
+    <div id="particles-js"></div>
+    
+    <?= view('components/navbar') ?>
+
+    <main class="flex-grow-1">
+        <div class="container mt-4">
+        <!-- Header -->
+        <div class="row">
+            <div class="col-12">
+                <h2 class="text-white">Admin Dashboard</h2>
+                <p class="text-white">Selamat datang, Admin <strong><?= esc($user['username'], 'html') ?></strong>!</p>
+            </div>
+        </div>
+
+        <!-- Tampilkan pesan dengan Animate.css -->
+        <?php if (session()->getFlashdata('success')): ?>
+            <div id="successAlert" class="alert alert-success animate__animated animate__bounceInDown animate__faster" role="alert">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-check-circle me-2 animate__animated animate__pulse animate__infinite"></i>
+                    <span><?= esc(session()->getFlashdata('success'), 'html') ?></span>
+                    <button type="button" class="btn-close ms-auto" onclick="dismissAlert('successAlert')"></button>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <!-- Statistik sederhana -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h4>Total Users</h4>
+                        <h2><?= count($users) ?></h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-danger text-white">
+                    <div class="card-body">
+                        <h4>Admin</h4>
+                        <h2><?= count(array_filter($users, function($u) { return $u['role'] == 'admin'; })) ?></h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h4>Users</h4>
+                        <h2><?= count(array_filter($users, function($u) { return $u['role'] == 'user'; })) ?></h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Daftar Users -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card hero-content">
+                    <div class="card-header bg-transparent border-0">
+                        <h5 class="mb-0">Daftar Semua Users</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Username</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($users as $userData): ?>
+                                    <tr>
+                                        <td><?= (int) $userData['id'] ?></td>
+                                        <td><?= esc($userData['username'], 'html') ?></td>
+                                        <td><?= esc($userData['email'], 'html') ?></td>
+                                        <td>
+                                            <span class="badge <?= esc($userData['role'], 'attr') == 'admin' ? 'bg-danger' : 'bg-primary' ?>">
+                                                <?= esc($userData['role'], 'html') ?>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+    </main>
+
+    <?= view('components/footer') ?>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- tsParticles Library untuk Among Us -->
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js"></script>
+    <!-- Among Us Particles Configuration -->
+    <script src="<?= base_url('assets/tsparticles/amongus/config.js') ?>"></script>
+    
+    <!-- Custom JavaScript dengan Animate.css -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-dismiss alerts
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                setTimeout(function() {
+                    dismissAlert(alert.id);
+                }, 4000);
+            });
+            
+            // Add entrance animations
+            const cards = document.querySelectorAll('.card');
+            cards.forEach((card, index) => {
+                card.style.animationDelay = `${index * 0.15}s`;
+                card.classList.add('animate__animated', 'animate__fadeInUp');
+            });
+            
+            // Add hover effects to stat cards
+            const statCards = document.querySelectorAll('.card.bg-primary, .card.bg-success, .card.bg-danger');
+            statCards.forEach(card => {
+                card.addEventListener('mouseenter', function() {
+                    this.classList.add('animate__animated', 'animate__pulse');
+                });
+                card.addEventListener('mouseleave', function() {
+                    this.classList.remove('animate__pulse');
+                });
+            });
+        });
+        
+        function dismissAlert(alertId) {
+            const alert = document.getElementById(alertId);
+            if (alert) {
+                alert.className = alert.className.replace(/animate__\\w+/g, '');
+                alert.classList.add('animate__animated', 'animate__fadeOutUp', 'animate__faster');
+                setTimeout(function() {
+                    alert.remove();
+                }, 600);
+            }
+        }
+    </script>
+</body>
+</html>
+```
+
+### 3.4 Buat Home Page
+
+Buat file `app/Views/home/index.php`:
+```php
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CI4 Simple - Home</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome  -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Among Us Particles CSS -->
+    <link href="<?= base_url('assets/tsparticles/amongus/style.css') ?>" rel="stylesheet">
+</head>
+
+<body class="d-flex flex-column min-vh-100">
+    <!-- Particles Background -->
+    <div id="particles-js"></div>
+    
+    <?= view('components/navbar') ?>
+
+    <main class="flex-grow-1 d-flex align-items-center">
+        <!-- Hero Section -->
+        <div class="container mt-5">
+            <div class="row justify-content-center">
+                <div class="col-md-8">
+                    <div class="hero-content text-center">
+                        <h1 class="display-5 mb-4">
+                            Forms, Security, and Sessions (Static Data)
+                        </h1>
+                        <p class="lead mb-4 text-muted">
+                            Sistem login sederhana dengan CodeIgniter 4
+                        </p>
+
+                        <div class="d-grid gap-2 d-md-block">
+                            <a href="<?= base_url('login') ?>" class="btn btn-primary btn-lg">
+                                <i class="fas fa-sign-in-alt me-2"></i>Login Sekarang
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <?= view('components/footer') ?>
+
+    <!-- tsParticles Library untuk Among Us -->
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js"></script>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Among Us Particles Configuration -->
+    <script src="<?= base_url('assets/tsparticles/amongus/config.js') ?>"></script>
+</body>
+
+</html>
+```
+
+### 3.5 Buat Footer Component
+
+Buat file `app/Views/components/footer.php`:
+```php
+<!-- Footer sederhana -->
+<footer class="bg-dark text-white mt-5">
+    <div class="container py-4">
+        <div class="row">
+            <div class="col-md-6">
+                <h5>CI4 Ikubaru</h5>
+            </div>
+            <div class="col-md-3">
+                <h6>Menu</h6>
+                <ul class="list-unstyled">
+                    <li><a href="<?= base_url('/') ?>" class="text-light text-decoration-none">Home</a></li>
+                    <?php if (session()->get('logged_in')): ?>
+                        <?php if (session()->get('role') === 'admin'): ?>
+                            <li><a href="<?= base_url('admin') ?>" class="text-light text-decoration-none">Admin Panel</a></li>
+                        <?php else: ?>
+                            <li><a href="<?= base_url('dashboard') ?>" class="text-light text-decoration-none">Dashboard</a></li>
+                        <?php endif; ?>
+                        <li><a href="<?= base_url('logout') ?>" class="text-light text-decoration-none">Logout</a></li>
+                    <?php else: ?>
+                        <li><a href="<?= base_url('login') ?>" class="text-light text-decoration-none">Login</a></li>
+                    <?php endif; ?>
+                </ul>
+            </div>
+            <div class="col-md-3">
+                <h6>Informasi</h6>
+                <ul class="list-unstyled">
+                    <li><small class="text-muted">CodeIgniter 4.x</small></li>
+                    <li><small class="text-muted">Bootstrap 5.1.3</small></li>
+                </ul>
+            </div>
+        </div>
+        <hr class="my-3">
+        <div class="row">
+            <div class="col-md-6">
+                <small>&copy; <?= date('Y') ?> CI4 Simple. All rights reserved.</small>
+            </div>
+            <div class="col-md-6 text-md-end">
+                <small class="text-muted">
+                    <?php if (session()->get('logged_in')): ?>
+                        Logged in as: <strong><?= esc(session()->get('username'), 'html') ?></strong> (<?= esc(session()->get('role'), 'html') ?>)
+                    <?php else: ?>
+                        Not logged in
+                    <?php endif; ?>
+                </small>
+            </div>
+        </div>
+    </div>
+</footer>
+```
+
+### 3.6 Update Demo Accounts Information
 
 Sesuai dengan UserModel, akun demo yang tersedia adalah:
 - **Admin:** ikubaru / password
@@ -941,161 +1278,366 @@ public/assets/
 
 Buat file `public/assets/tsparticles/amongus/config.js`:
 ```javascript
+//tsParticles library - https://github.com/matteobruni/tsparticles
+// Original Among Us Configuration
+
 const amongUsConfig = {
-    background: {
-        color: {
-            value: "transparent",
-        },
-    },
-    fpsLimit: 120,
+    fpsLimit: 60,
     particles: {
-        color: {
-            value: ["#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff", "#ffffff", "#000000"],
-        },
-        move: {
-            direction: "none",
-            enable: true,
-            outModes: {
-                default: "bounce",
+        groups: {
+            z5000: {
+                number: {
+                    value: 70
+                },
+                zIndex: {
+                    value: 5000
+                }
             },
-            random: true,
-            speed: 2,
-            straight: false,
+            z7500: {
+                number: {
+                    value: 30
+                },
+                zIndex: {
+                    value: 75
+                }
+            },
+            z2500: {
+                number: {
+                    value: 50
+                },
+                zIndex: {
+                    value: 25
+                }
+            },
+            z1000: {
+                number: {
+                    value: 40
+                },
+                zIndex: {
+                    value: 10
+                }
+            }
         },
         number: {
+            value: 200,
             density: {
-                enable: true,
-                area: 800,
-            },
-            value: 30,
+                enable: false,
+                area: 800
+            }
         },
-        opacity: {
-            value: 0.8,
+        color: {
+            value: "#fff",
+            animation: {
+                enable: false,
+                speed: 20,
+                sync: true
+            }
         },
         shape: {
-            type: "image",
-            options: {
-                image: [
-                    {
-                        src: "https://cdn.jsdelivr.net/gh/matteobruni/tsparticles@main/images/amongus_blue.png",
-                        width: 32,
-                        height: 32,
-                    },
-                    {
-                        src: "https://cdn.jsdelivr.net/gh/matteobruni/tsparticles@main/images/amongus_red.png",
-                        width: 32,
-                        height: 32,
-                    },
-                    {
-                        src: "https://cdn.jsdelivr.net/gh/matteobruni/tsparticles@main/images/amongus_green.png",
-                        width: 32,
-                        height: 32,
-                    },
-                ]
+            type: "circle"
+        },
+        opacity: {
+            value: { min: 0.1, max: 1 },
+            random: false,
+            animation: {
+                enable: false,
+                speed: 3,
+                sync: false
             }
         },
         size: {
-            value: { min: 16, max: 32 },
+            value: 3
         },
+        move: {
+            angle: {
+                value: 10,
+                offset: 0
+            },
+            enable: true,
+            speed: 5,
+            direction: "right",
+            random: false,
+            straight: true,
+            outModes: "out"
+        },
+        zIndex: {
+            value: 5,
+            opacityRate: 0.5
+        }
+    },
+    interactivity: {
+        detectsOn: "canvas",
+        events: {
+            onHover: {
+                enable: false,
+                mode: "repulse"
+            },
+            onClick: {
+                enable: true,
+                mode: "push"
+            },
+            resize: true
+        },
+        modes: {
+            grab: {
+                distance: 400,
+                links: {
+                    opacity: 1
+                }
+            },
+            bubble: {
+                distance: 400,
+                size: 40,
+                duration: 2,
+                opacity: 0.8
+            },
+            repulse: {
+                distance: 200
+            },
+            push: {
+                quantity: 4,
+                groups: ["z5000", "z7500", "z2500", "z1000"]
+            },
+            remove: {
+                quantity: 2
+            }
+        }
     },
     detectRetina: true,
+    background: {
+        color: {
+            value: "transparent"
+        }
+    },
     emitters: {
-        direction: "top",
-        life: {
-            count: 0,
-            duration: 0.1,
-            delay: 0.1,
+        position: {
+            y: 55,
+            x: -30
         },
         rate: {
-            delay: 0.15,
-            quantity: 1,
+            delay: 7,
+            quantity: 1
         },
         size: {
             width: 0,
-            height: 0,
+            height: 0
         },
-    },
-};
-```
-
-### 4.3 Buat Initialization Script
-
-Buat file `public/assets/tsparticles/amongus/init.js`:
-```javascript
-function initAmongUsParticles(containerId) {
-    if (typeof tsParticles !== 'undefined') {
-        tsParticles.load(containerId, amongUsConfig).then((container) => {
-            console.log("Among Us particles loaded successfully!");
-        }).catch((error) => {
-            console.error("Error loading Among Us particles:", error);
-            // Fallback to simple particles
-            initSimpleParticles(containerId);
-        });
-    } else {
-        console.warn("tsParticles not loaded, using fallback");
-        initSimpleParticles(containerId);
-    }
-}
-
-function initSimpleParticles(containerId) {
-    const simpleConfig = {
-        background: {
-            color: {
-                value: "transparent",
-            },
-        },
-        fpsLimit: 120,
         particles: {
-            color: {
-                value: "#ffffff",
-            },
-            move: {
-                direction: "none",
-                enable: true,
-                outModes: {
-                    default: "bounce",
-                },
-                random: false,
-                speed: 1,
-                straight: false,
-            },
-            number: {
-                density: {
-                    enable: true,
-                    area: 800,
-                },
-                value: 50,
+            shape: {
+                type: "images",
+                options: {
+                    images: [
+                        {
+                            src: "https://particles.js.org/images/amongus_blue.png",
+                            width: 205,
+                            height: 267
+                        },
+                        {
+                            src: "https://particles.js.org/images/amongus_cyan.png",
+                            width: 207,
+                            height: 265
+                        },
+                        {
+                            src: "https://particles.js.org/images/amongus_green.png",
+                            width: 204,
+                            height: 266
+                        },
+                        {
+                            src: "https://particles.js.org/images/amongus_lime.png",
+                            width: 206,
+                            height: 267
+                        },
+                        {
+                            src: "https://particles.js.org/images/amongus_orange.png",
+                            width: 205,
+                            height: 265
+                        },
+                        {
+                            src: "https://particles.js.org/images/amongus_pink.png",
+                            width: 205,
+                            height: 265
+                        },
+                        {
+                            src: "https://particles.js.org/images/amongus_red.png",
+                            width: 204,
+                            height: 267
+                        },
+                        {
+                            src: "https://particles.js.org/images/amongus_white.png",
+                            width: 205,
+                            height: 267
+                        }
+                    ]
+                }
             },
             opacity: {
-                value: 0.3,
-            },
-            shape: {
-                type: "circle",
+                value: 1
             },
             size: {
-                value: { min: 1, max: 3 },
+                value: 40
             },
-        },
-        detectRetina: true,
-    };
-    
+            move: {
+                speed: 10,
+                outModes: {
+                    default: "destroy",
+                    left: "none"
+                },
+                straight: true
+            },
+            zIndex: {
+                value: 0
+            },
+            rotate: {
+                value: {
+                    min: 0,
+                    max: 360
+                },
+                animation: {
+                    enable: true,
+                    speed: 10,
+                    sync: true
+                }
+            }
+        }
+    }
+};
+
+// Initialize original Among Us particles with tsParticles
+async function initAmongUsParticles() {
     if (typeof tsParticles !== 'undefined') {
-        tsParticles.load(containerId, simpleConfig);
+        await loadFull(tsParticles);
+        await tsParticles.load("particles-js", amongUsConfig);
+        console.log('Original Among Us Particles initialized successfully!');
+    } else {
+        console.error('tsParticles library not loaded!');
     }
 }
 
-// Auto-initialize when DOM is ready
+// Auto-initialize when DOM is ready (if this is the active config)
 document.addEventListener('DOMContentLoaded', function() {
-    const particlesContainer = document.getElementById('particles-js');
-    if (particlesContainer) {
-        // Try Among Us first, fallback to simple if needed
-        if (typeof amongUsConfig !== 'undefined') {
-            initAmongUsParticles('particles-js');
-        } else {
-            initSimpleParticles('particles-js');
-        }
+    if (typeof tsParticles !== 'undefined') {
+        initAmongUsParticles();
+    } else {
+        setTimeout(function() {
+            initAmongUsParticles();
+        }, 500);
     }
 });
+```
+
+### 4.3 Buat Among Us Style CSS
+
+Buat file `public/assets/tsparticles/amongus/style.css`:
+```css
+/* Among Us Particles Background dengan Gradient Beautiful */
+
+/* Particles container dengan gradient background seperti simple */
+#particles-js {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    z-index: -1;
+    background: black;
+}
+
+/* Override body background */
+body {
+    background: transparent !important;
+}
+
+/* Hero content styling dengan glass effect yang beautiful */
+.hero-content {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 3rem 2rem;
+    transition: all 0.3s ease;
+    color: #333 !important;
+}
+
+.hero-content:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+}
+
+/* Gradient text untuk judul yang beautiful */
+.hero-content h1 {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: bold;
+}
+
+/* Text styling yang readable */
+.hero-content .lead {
+    color: rgba(51, 51, 51, 0.9) !important;
+}
+
+.hero-content small {
+    color: rgba(51, 51, 51, 0.7) !important;
+}
+
+/* Button styling dengan gradient yang konsisten */
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 50px;
+    padding: 12px 30px;
+    font-weight: 600;
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+    transition: all 0.3s ease;
+    color: white !important;
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 15px 35px rgba(102, 126, 234, 0.4);
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+/* Navbar styling untuk background gradient */
+.navbar {
+    background: rgba(52, 58, 64, 0.95) !important;
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+/* Footer styling */
+footer {
+    background: rgba(52, 58, 64, 0.95) !important;
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .hero-content {
+        padding: 2rem 1.5rem;
+        margin: 1rem;
+    }
+}
+
+/* Animation untuk smooth loading */
+.hero-content {
+    animation: fadeInUp 0.8s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
 ```
 
 ### 4.4 Update Login View dengan Advanced Particles
@@ -1265,27 +1807,151 @@ Update `app/Controllers/FormController.php`, tambahkan method logging:
         session()->destroy();
         return redirect()->to('/login')->with('success', 'Logout berhasil');
     }
+}
 ```
+
+## 6. Testing dan Verifikasi Aplikasi
+
+### 6.1 Uji Coba Login
+
+1. **Akses aplikasi** di browser: `http://localhost/ci4_enterprise`
+2. **Test Users yang tersedia:**
+   - Admin: `ikubaru` / `password123`
+   - User: `ikhbal` / `password`
+   - User: `adira` / `password`
+
+### 6.2 Verifikasi Fitur Security
+
+1. **Content Security Policy (CSP)** - Buka Developer Tools > Network > Response Headers
+2. **XSS Protection** - Test dengan input malicious di form login  
+3. **CSRF Protection** - Automatic token validation di form submissions
+4. **Rate Limiting** - Coba login 5x dengan password salah
+5. **Input Validation** - Test dengan username/password tidak valid
+
+### 6.3 Test Particle Effects
+
+1. **Among Us Particles** - Harus terlihat di background semua halaman
+2. **Glass Morphism** - UI components harus transparan dengan blur effect
+3. **Responsive Design** - Test di mobile devices
+4. **Animation Performance** - Check smooth 60fps animations
+
+### 6.4 Test User Flow
+
+1. **Landing Page** → Login → Dashboard → Logout
+2. **Different Roles** - Admin vs User dashboard differences
+3. **Session Management** - Auto logout on browser close
+4. **Navigation Flow** - Semua menu dan links working properly
+
+## 7. Struktur File Lengkap Aplikasi
+
+### 7.1 File Structure Overview
+
+```
+ci4_enterprise/
+├── app/
+│   ├── Config/
+│   │   ├── Routes.php (✅ Complete routing)
+│   │   └── Database.php (✅ DB configuration)
+│   ├── Controllers/
+│   │   ├── BaseController.php (✅ Security headers & XSS protection)
+│   │   ├── FormController.php (✅ Main authentication & dashboard logic)
+│   │   ├── About.php (✅ About page controller)
+│   │   ├── Hello.php (✅ Hello controller)
+│   │   └── Home.php (✅ Home controller)
+│   ├── Models/
+│   │   └── UserModel.php (✅ User authentication with static data)
+│   ├── Views/
+│   │   ├── components/
+│   │   │   ├── navbar.php (✅ Dynamic navigation with auth status)
+│   │   │   └── footer.php (✅ Dynamic footer with session info)
+│   │   ├── home/
+│   │   │   └── index.php (✅ Landing page dengan Among Us particles)
+│   │   ├── dashboard/
+│   │   │   ├── simple.php (✅ User dashboard)
+│   │   │   └── admin_simple.php (✅ Admin dashboard dengan statistics)
+│   │   ├── auth/
+│   │   │   └── login_simple.php (✅ Login form dengan glass morphism)
+│   │   ├── about_view.php (✅ About page view)
+│   │   ├── contact_view.php (✅ Contact page view)
+│   │   ├── hello_view.php (✅ Hello page view)
+│   │   └── welcome_message.php (✅ CI4 default welcome)
+│   └── ...
+├── public/
+│   ├── assets/
+│   │   └── tsparticles/
+│   │       └── amongus/
+│   │           ├── config.js (✅ Full Among Us particle configuration)
+│   │           └── style.css (✅ Glass morphism & gradient styling)
+│   ├── index.php (✅ Entry point)
+│   ├── favicon.ico (✅ Website icon)
+│   └── robots.txt (✅ SEO file)
+├── vendor/ (✅ Composer dependencies)
+├── writable/ (✅ Cache, logs, sessions)
+├── composer.json (✅ Project dependencies)
+├── composer.lock (✅ Dependency lock file)
+├── env (✅ Environment template)
+├── spark (✅ CI4 CLI tool)
+└── README.md (✅ Complete documentation)
+```
+
+### 7.2 Key Features Implemented
+
+#### 🔒 **Security Features**
+- Content Security Policy (CSP) headers
+- X-XSS-Protection & X-Frame-Options
+- CSRF protection (CodeIgniter built-in)
+- Input validation & sanitization
+- Rate limiting simulation
+- Secure session management
+
+#### 🎨 **UI/UX Features**  
+- Glass morphism design system
+- Among Us particle background animations
+- Responsive Bootstrap 5.1.3 layout
+- Font Awesome 6.0 icons
+- Animate.css 4.1.1 animations
+- Gradient color schemes
+
+#### 🚀 **Technical Features**
+- MVC architecture pattern
+- Session-based authentication
+- Role-based access control (Admin/User)
+- Dynamic component rendering
+- Clean URL routing
+- Error handling & logging
+
+#### 📱 **User Experience**
+- Interactive particle effects
+- Smooth page transitions
+- Mobile-responsive design
+- Dynamic navigation based on auth status
+- Beautiful login/dashboard interfaces
+- Auto-dismissing alerts with progress bars
 
 ## Conclusion
 
-Anda telah berhasil membangun aplikasi enterprise CodeIgniter 4 dengan fitur:
+Anda telah berhasil membangun aplikasi enterprise CodeIgniter 4 yang komprehensif dengan fitur:
 
-✅ **Modern Authentication System** - Login/logout dengan session management  
-✅ **Advanced Security** - CSRF, XSS protection, security headers  
-✅ **Beautiful UI** - Glass morphism design dengan animations  
-✅ **Interactive Background** - Among Us particles dengan tsParticles  
-✅ **Responsive Design** - Mobile-first approach  
-✅ **Role-based Access** - Admin dan User dashboards  
+✅ **Modern Authentication System** - Login/logout dengan session management yang aman  
+✅ **Advanced Security** - CSRF, XSS protection, comprehensive security headers  
+✅ **Beautiful UI** - Glass morphism design dengan smooth animations  
+✅ **Interactive Background** - Among Us particles dengan tsParticles library  
+✅ **Responsive Design** - Mobile-first Bootstrap approach  
+✅ **Role-based Access** - Terpisah admin dan user dashboards  
 ✅ **Production Ready** - Logging, rate limiting, security hardening  
+✅ **Complete Documentation** - Setiap file dan fitur terdokumentasi lengkap
 
-Aplikasi ini menggunakan best practices modern web development dengan fokus pada security, user experience, dan maintainable code architecture.
+Aplikasi ini menggunakan best practices modern web development dengan fokus pada security, user experience, dan maintainable code architecture yang enterprise-grade.
 
-**Next Steps:**
-- Implementasi database real (MySQL/PostgreSQL)
-- Tambah fitur user registration
-- Implementasi email verification
-- Tambah two-factor authentication
+**Next Steps untuk Development Lanjutan:**
+- Implementasi database real (MySQL/PostgreSQL) 
+- Tambah fitur user registration & email verification
+- Implementasi two-factor authentication (2FA)
+- Add comprehensive logging system
+- Integrate with external APIs
+- Implement advanced role permissions
+- Add data visualization charts
+- Optimize performance dengan caching
 - Setup automated testing
 - Implementasi caching system
 
