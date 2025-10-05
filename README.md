@@ -1776,134 +1776,9 @@ Edit file `app/Config/Security.php`, cari dan update:
     public bool $regenerate = true;
 ```
 
-### 5.2 Enhanced FormController with Better Security
+## 6. Struktur File Lengkap Aplikasi
 
-Update `app/Controllers/FormController.php`, tambahkan method logging:
-```php
-    private function logActivity($action, $username = null)
-    {
-        $username = $username ?? session()->get('username') ?? 'guest';
-        $ip = $this->request->getIPAddress();
-        $userAgent = $this->request->getUserAgent();
-        
-        log_message('info', "Security Log: {$action} | User: {$username} | IP: {$ip} | UserAgent: {$userAgent}");
-    }
-    
-    public function processLogin()
-    {
-        // Log login attempt
-        $username = $this->request->getPost('username');
-        $this->logActivity('Login attempt', $username);
-        
-        $rules = [
-            'username' => 'required|min_length[3]|max_length[20]',
-            'password' => 'required|min_length[6]|max_length[255]'
-        ];
-        
-        if (!$this->validate($rules)) {
-            $this->logActivity('Login failed - validation error', $username);
-            return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
-        }
-        
-        $username = $this->request->getPost('username');
-        $password = $this->request->getPost('password');
-        
-        // Enhanced Security: Multiple validation layers
-        if (!preg_match('/^[a-zA-Z0-9_]{3,20}$/', $username)) {
-            $this->logActivity('Login failed - invalid characters', $username);
-            return redirect()->back()->with('error', 'Username mengandung karakter tidak valid');
-        }
-        
-        // Rate limiting simulation (in production, use proper rate limiting)
-        $sessionKey = 'login_attempts_' . $this->request->getIPAddress();
-        $attempts = session()->get($sessionKey) ?? 0;
-        
-        if ($attempts >= 5) {
-            $this->logActivity('Login blocked - too many attempts', $username);
-            return redirect()->back()->with('error', 'Terlalu banyak percobaan login. Coba lagi nanti.');
-        }
-        
-        // XSS Prevention
-        $username = esc($username);
-        $password = esc($password);
-        
-        $user = $this->userModel->verifyPassword($username, $password);
-        
-        if ($user) {
-            // Reset failed attempts
-            session()->remove($sessionKey);
-            
-            // Set session data
-            $sessionData = [
-                'user_id' => $user['id'],
-                'username' => $user['username'],
-                'role' => $user['role'],
-                'email' => $user['email'],
-                'fullname' => $user['fullname'],
-                'isLoggedIn' => true,
-                'login_time' => date('Y-m-d H:i:s')
-            ];
-            
-            session()->set($sessionData);
-            
-            $this->logActivity('Login successful', $username);
-            
-            // Redirect berdasarkan role
-            return redirect()->to('/dashboard/' . $user['role'])->with('success', 'Login berhasil!');
-        } else {
-            // Increment failed attempts
-            session()->set($sessionKey, $attempts + 1);
-            
-            $this->logActivity('Login failed - invalid credentials', $username);
-            return redirect()->back()->with('error', 'Username atau password salah');
-        }
-    }
-    
-    public function logout()
-    {
-        $username = session()->get('username');
-        $this->logActivity('Logout', $username);
-        
-        session()->destroy();
-        return redirect()->to('/login')->with('success', 'Logout berhasil');
-    }
-```
-
-## 6. Testing dan Verifikasi Aplikasi
-
-### 6.1 Uji Coba Login
-
-1. **Akses aplikasi** di browser: `http://localhost/ci4_enterprise`
-2. **Test Users yang tersedia:**
-   - Admin: `ikubaru` / `password123`
-   - User: `ikhbal` / `password`
-   - User: `adira` / `password`
-
-### 6.2 Verifikasi Fitur Security
-
-1. **Content Security Policy (CSP)** - Buka Developer Tools > Network > Response Headers
-2. **XSS Protection** - Test dengan input malicious di form login  
-3. **CSRF Protection** - Automatic token validation di form submissions
-4. **Rate Limiting** - Coba login 5x dengan password salah
-5. **Input Validation** - Test dengan username/password tidak valid
-
-### 6.3 Test Particle Effects
-
-1. **Among Us Particles** - Harus terlihat di background semua halaman
-2. **Glass Morphism** - UI components harus transparan dengan blur effect
-3. **Responsive Design** - Test di mobile devices
-4. **Animation Performance** - Check smooth 60fps animations
-
-### 6.4 Test User Flow
-
-1. **Landing Page** → Login → Dashboard → Logout
-2. **Different Roles** - Admin vs User dashboard differences
-3. **Session Management** - Auto logout on browser close
-4. **Navigation Flow** - Semua menu dan links working properly
-
-## 7. Struktur File Lengkap Aplikasi
-
-### 7.1 File Structure Overview
+### 6.1 File Structure Overview
 
 ```
 ci4_enterprise/
@@ -1953,7 +1828,7 @@ ci4_enterprise/
 └── README.md (✅ Complete documentation)
 ```
 
-### 7.2 Key Features Implemented
+### 6.2 Key Features Implemented
 
 #### 🔒 **Security Features**
 - Content Security Policy (CSP) headers
@@ -2000,22 +1875,6 @@ Anda telah berhasil membangun aplikasi enterprise CodeIgniter 4 yang komprehensi
 ✅ **Production Ready** - Logging, rate limiting, security hardening  
 ✅ **Complete Documentation** - Setiap file dan fitur terdokumentasi lengkap
 
-Aplikasi ini menggunakan best practices modern web development dengan fokus pada security, user experience, dan maintainable code architecture yang enterprise-grade.
-
-**Next Steps untuk Development Lanjutan:**
-- Implementasi database real (MySQL/PostgreSQL) 
-- Tambah fitur user registration & email verification
-- Implementasi two-factor authentication (2FA)
-- Add comprehensive logging system
-- Integrate with external APIs
-- Implement advanced role permissions
-- Add data visualization charts
-- Optimize performance dengan caching
-- Setup automated testing
-- Implementasi caching system
-
 ---
 
 **Happy Coding! 🚀**
-
-*Tutorial ini mendemonstrasikan pengembangan step-by-step dari template dasar CodeIgniter 4 menjadi aplikasi enterprise modern dengan fokus pada security dan user experience.*
