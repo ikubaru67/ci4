@@ -437,7 +437,7 @@ Buat file `app/Views/auth/login_simple.php`:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= $title ?> - CI4 Simple</title>
+    <title><?= esc($title) ?> - CI4 Simple</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
@@ -481,7 +481,7 @@ Buat file `app/Views/auth/login_simple.php`:
             <div class="col-md-6">
                 <div class="card hero-content">
                     <div class="card-header text-center bg-transparent border-0">
-                        <h3 class="mb-0"><?= $title ?></h3>
+                        <h3 class="mb-0"><?= esc($title) ?></h3>
                     </div>
                     <div class="card-body">
                         
@@ -605,7 +605,7 @@ Buat file `app/Views/auth/login_simple.php`:
         function dismissAlert(alertId) {
             const alert = document.getElementById(alertId);
             if (alert) {
-                alert.className = alert.className.replace(/animate__\\w+/g, '');
+                alert.className = alert.className.replace(/animate__\w+/g, '');
                 alert.classList.add('animate__animated', 'animate__fadeOutUp', 'animate__faster');
                 
                 setTimeout(function() {
@@ -623,7 +623,68 @@ Buat file `app/Views/auth/login_simple.php`:
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Logging in...';
             submitBtn.disabled = true;
             submitBtn.classList.add('animate__animated', 'animate__pulse', 'animate__infinite');
+            
+            // Add form shake on error (will be handled by redirect)
+            setTimeout(function() {
+                if (document.querySelector('.alert-danger')) {
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('animate__pulse', 'animate__infinite');
+                    
+                    // Shake the form if error
+                    const form = document.querySelector('form');
+                    form.classList.add('animate__animated', 'animate__shakeX');
+                    setTimeout(() => form.classList.remove('animate__shakeX'), 1000);
+                }
+            }, 100);
         });
+        
+        // Add entrance animation to form elements
+        window.addEventListener('load', function() {
+            const formElements = document.querySelectorAll('.form-control, .btn, .card');
+            formElements.forEach((element, index) => {
+                element.style.animationDelay = `${index * 0.1}s`;
+            });
+        });
+        
+        // Function for future floating notifications
+        function showNotification(message, type = 'info', duration = 4000) {
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type} position-fixed animate__animated animate__slideInRight`;
+            notification.style.cssText = `
+                top: 20px;
+                right: 20px;
+                z-index: 9999;
+                min-width: 300px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            `;
+            
+            const iconClass = type === 'success' ? 'check-circle' : 
+                             type === 'danger' ? 'exclamation-triangle' : 
+                             type === 'warning' ? 'exclamation-circle' : 'info-circle';
+            
+            notification.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-${iconClass} me-2"></i>
+                    <span>${message}</span>
+                    <button type="button" class="btn-close ms-auto" onclick="dismissNotification(this)"></button>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove
+            setTimeout(function() {
+                dismissNotification(notification.querySelector('.btn-close'));
+            }, duration);
+        }
+        
+        function dismissNotification(btn) {
+            const notification = btn.closest('.alert');
+            notification.classList.remove('animate__slideInRight');
+            notification.classList.add('animate__slideOutRight');
+            setTimeout(() => notification.remove(), 500);
+        }
     </script>
 
     <!-- tsParticles Library untuk Among Us -->
@@ -1806,7 +1867,6 @@ Update `app/Controllers/FormController.php`, tambahkan method logging:
         session()->destroy();
         return redirect()->to('/login')->with('success', 'Logout berhasil');
     }
-}
 ```
 
 ## 6. Testing dan Verifikasi Aplikasi
