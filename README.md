@@ -322,7 +322,7 @@ class FormController extends BaseController
 
 Edit file `app/Controllers/BaseController.php`, tambahkan method di dalam class:
 ```php
-    public function initController(RequestInterface $request, ResponseInterface $response, \Psr\Log\LoggerInterface $logger)
+    public function initController(RequestInterface $request, ResponseInterface $response, LoggerInterface $logger)
     {
         parent::initController($request, $response, $logger);
         
