@@ -455,7 +455,7 @@ Buat file `app/Views/auth/login_simple.php`:
             height: 3px;
             background: rgba(255,255,255,0.8);
             border-radius: 0 0 0.375rem 0.375rem;
-            animation: progressBar 5s linear forwards;
+            animation: progressBar 2s linear forwards;
         }
         
         @keyframes progressBar {
@@ -582,7 +582,7 @@ Buat file `app/Views/auth/login_simple.php`:
                 // Auto dismiss after 5 seconds
                 setTimeout(function() {
                     dismissAlert(alert.id);
-                }, 5000);
+                }, 2000);
                 
                 // Pause auto-dismiss on hover
                 alert.addEventListener('mouseenter', function() {
